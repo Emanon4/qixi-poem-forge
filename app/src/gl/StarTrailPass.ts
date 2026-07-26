@@ -1,5 +1,5 @@
 import { Program } from './Program'
-import type { FrameCtx, Pass, Renderer } from './Renderer'
+import { ORDER, type FrameCtx, type Pass, type Renderer } from './Renderer'
 
 const TRAIL_VERT = /* glsl */ `#version 300 es
 in vec2  aPos;   // byWidth 空间：x∈[-0.5,0.5]，y 按比例延伸
@@ -60,6 +60,7 @@ const FLOATS_PER_PARTICLE = 5 // x, y, life, size, seed
 export class StarTrailPass implements Pass {
   readonly name = 'starTrail'
   enabled = true
+  order: number = ORDER.trail
 
   private readonly gl: WebGL2RenderingContext
   private readonly program: Program

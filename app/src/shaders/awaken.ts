@@ -98,10 +98,8 @@ void main() {
 
   if (alpha < 0.004) discard;
 
-  col = aces(col);
-  col = lin2srgb(col);
-  col = dither(col, gl_FragCoord.xy);
-  fragColor = vec4(col * alpha, alpha) * uFade; // 预乘 alpha
+  // 线性 HDR + 预乘 alpha；色调映射交给 PostFX
+  fragColor = vec4(col * alpha, alpha) * uFade;
 }
 `,
   FULL_KIT,

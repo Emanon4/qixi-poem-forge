@@ -205,11 +205,11 @@ export function AwakenScene({ stage }: { stage: GalaxyStage | null }) {
                     gsap.to(progress.current, {
                       fade: 0,
                       duration: 0.5,
-                      onComplete: () => setAct('choose'),
+                      onComplete: () => setAct('river'),
                     })
                   }}
                 >
-                  为它写一首诗
+                  把它投进星河
                 </button>
               </div>
             </>

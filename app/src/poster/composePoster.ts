@@ -1,266 +1,265 @@
 import type { Poem } from '@/copy/poems'
-import type { StyleId } from '@/design/catalog'
-import type { SubjectBox } from '@/vision/subject'
+import type { Reading } from '@/game/constellation'
 
 /**
- * 静态海报合成器 —— 独立的 Canvas 2D 通道，不复用 WebGL 舞台。
+ * 心意签的图片合成 —— 独立的 Canvas 2D 通道，不复用 WebGL 舞台。
  *
- * 为什么不用 html2canvas：它永远对不上 shader 舞台的像素，
- * 而且中文字体、混合模式、滤镜的还原都不可靠。
- * 单独写一遍合成，代价是几十行，换来的是「导出即所见」。
+ * 为什么不用 html2canvas：它永远对不上 shader 舞台的像素，中文字体、
+ * 混合模式、滤镜的还原都不可靠。单独写一遍，换来「导出即所见」。
+ *
+ * 出 9:16 —— 这是要发抖音的。
  */
 
 const W = 1080
-const H = 1440
+const H = 1920
 
 const UI = '-apple-system, "PingFang SC", "Hiragino Sans GB", sans-serif'
 const SERIF = '"Songti SC", "STSong", "Source Han Serif SC", serif'
 const KAI = '"Kaiti SC", "STKaiti", "Songti SC", serif'
 
 interface SkinPaint {
-  /** 背景渐变的三档色 */
-  bg: [string, string, string]
+  paper: string
   ink: string
   accent: string
   seal: string
   titleFont: string
   poemFont: string
-  /** 古风走竖排 */
-  vertical: boolean
 }
 
-const SKINS: Record<StyleId | string, SkinPaint> = {
+const SKINS: Record<string, SkinPaint> = {
   guofeng: {
-    bg: ['#f7f1e2', '#efe7d5', '#e3d6bd'],
+    paper: '#efe7d5',
     ink: '#241f33',
     accent: '#b9975b',
     seal: '#b3342a',
     titleFont: KAI,
     poemFont: SERIF,
-    vertical: true,
   },
   fafeng: {
-    bg: ['#fff06a', '#ffe24b', '#ffcf2e'],
+    paper: '#ffe24b',
     ink: '#111111',
     accent: '#ff3e7f',
     seal: '#e3170a',
     titleFont: UI,
     poemFont: UI,
-    vertical: false,
   },
   galgame: {
-    bg: ['#2a2c60', '#1b1c3f', '#111230'],
+    paper: '#1b1c3f',
     ink: '#f2f4ff',
     accent: '#6c7bff',
     seal: '#ff9ec4',
     titleFont: UI,
     poemFont: UI,
-    vertical: false,
   },
 }
 
-/** 海棠形（四曲）路径，与 shader / SVG 用的是同一条极坐标公式。 */
-function quatrefoil(
+/** 夜空底。星位用固定散列，同一枚签导出多少次都长一样。 */
+function paintNight(ctx: CanvasRenderingContext2D): void {
+  const g = ctx.createLinearGradient(0, H, W * 0.4, 0)
+  g.addColorStop(0, '#6e3f6b')
+  g.addColorStop(0.22, '#4a2f78')
+  g.addColorStop(0.55, '#2e1f5c')
+  g.addColorStop(1, '#0b0824')
+  ctx.fillStyle = g
+  ctx.fillRect(0, 0, W, H)
+
+  let s = 2166136261
+  const rand = (): number => {
+    s ^= s << 13
+    s ^= s >>> 17
+    s ^= s << 5
+    s >>>= 0
+    return s / 4294967296
+  }
+  ctx.fillStyle = '#fff8e8'
+  for (let i = 0; i < 420; i++) {
+    const x = rand() * W
+    const y = rand() * H
+    const r = rand() * 1.9 + 0.35
+    ctx.globalAlpha = 0.25 + rand() * 0.7
+    ctx.beginPath()
+    ctx.arc(x, y, r, 0, Math.PI * 2)
+    ctx.fill()
+  }
+  ctx.globalAlpha = 1
+}
+
+function roundRect(
   ctx: CanvasRenderingContext2D,
-  cx: number,
-  cy: number,
-  radius: number,
-  lobe = 0.14,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
 ): void {
   ctx.beginPath()
-  const steps = 256
-  for (let i = 0; i <= steps; i++) {
-    const t = (i / steps) * Math.PI * 2
-    const r = radius * (1 - lobe + lobe * Math.cos(4 * t))
-    const x = cx + r * Math.cos(t)
-    const y = cy + r * Math.sin(t)
-    if (i === 0) ctx.moveTo(x, y)
-    else ctx.lineTo(x, y)
-  }
+  ctx.moveTo(x + r, y)
+  ctx.arcTo(x + w, y, x + w, y + h, r)
+  ctx.arcTo(x + w, y + h, x, y + h, r)
+  ctx.arcTo(x, y + h, x, y, r)
+  ctx.arcTo(x, y, x + w, y, r)
   ctx.closePath()
 }
 
-/** 竖排：逐字往下画，列从右往左推。 */
-function drawVertical(
-  ctx: CanvasRenderingContext2D,
-  lines: string[],
-  rightX: number,
-  topY: number,
-  fontSize: number,
-): void {
-  const colGap = fontSize * 1.75
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'top'
-  lines.forEach((line, col) => {
-    const x = rightX - col * colGap
-    // 行末标点不占一格，省掉一个视觉空洞
-    const chars = [...line.replace(/[，。、；：]$/, '')]
-    chars.forEach((ch, row) => {
-      ctx.fillText(ch, x, topY + row * fontSize * 1.28)
-    })
-  })
-}
-
-function drawHorizontal(
-  ctx: CanvasRenderingContext2D,
-  lines: string[],
-  centerX: number,
-  topY: number,
-  fontSize: number,
-): void {
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'top'
-  lines.forEach((line, i) => {
-    ctx.fillText(line, centerX, topY + i * fontSize * 1.72)
-  })
-}
-
-export interface PosterInput {
+export interface CharmInput {
+  reading: Reading
   poem: Poem
-  style: StyleId
   category: string
-  /** 商品截图。传了就在海棠窗里放主体裁切 */
-  bitmap?: ImageBitmap | HTMLImageElement | null
-  subject?: SubjectBox | null
 }
 
-export async function composePoster(input: PosterInput): Promise<Blob> {
-  const skin = SKINS[input.style] ?? SKINS.guofeng
+export async function composeCharm(input: CharmInput): Promise<Blob> {
+  const { reading, poem, category } = input
+  const skin = SKINS[reading.style] ?? SKINS.guofeng
+
   const canvas = document.createElement('canvas')
   canvas.width = W
   canvas.height = H
   const ctx = canvas.getContext('2d')!
 
-  // ── 底：三档竖向渐变 + 极淡噪点，避免大面积平色显廉价 ──
-  const bg = ctx.createLinearGradient(0, 0, W * 0.35, H)
-  bg.addColorStop(0, skin.bg[0])
-  bg.addColorStop(0.55, skin.bg[1])
-  bg.addColorStop(1, skin.bg[2])
-  ctx.fillStyle = bg
-  ctx.fillRect(0, 0, W, H)
+  paintNight(ctx)
+
+  // ── 签本体 ──
+  const slipW = 840
+  const slipH = 1400
+  const slipX = (W - slipW) / 2
+  const slipY = 240
 
   ctx.save()
-  ctx.globalAlpha = 0.05
-  for (let i = 0; i < 2600; i++) {
-    const x = Math.floor((i * 7919) % W)
-    const y = Math.floor((i * 104729) % H)
-    ctx.fillStyle = i % 2 ? skin.ink : '#ffffff'
-    ctx.fillRect(x, y, 2, 2)
-  }
+  ctx.shadowColor = 'rgba(0,0,0,0.55)'
+  ctx.shadowBlur = 60
+  ctx.shadowOffsetY = 24
+  ctx.fillStyle = skin.paper
+  roundRect(ctx, slipX, slipY, slipW, slipH, 8)
+  ctx.fill()
   ctx.restore()
 
-  // ── 标题 ──
-  ctx.fillStyle = skin.ink
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'top'
-  ctx.font = `600 84px ${skin.titleFont}`
-  ctx.fillText(input.poem.title, W / 2, 104)
-
-  // ── 海棠开窗 + 商品主体 ──
-  const winCX = W / 2
-  const winCY = 480
-  const winR = 208
-
-  ctx.save()
-  quatrefoil(ctx, winCX, winCY, winR)
-  ctx.clip()
-  // 窗底
-  const inner = ctx.createRadialGradient(winCX, winCY - winR * 0.3, 0, winCX, winCY, winR)
-  inner.addColorStop(0, '#ffffff')
-  inner.addColorStop(1, skin.bg[2])
-  ctx.fillStyle = inner
-  ctx.fillRect(winCX - winR, winCY - winR, winR * 2, winR * 2)
-
-  if (!input.bitmap || !input.subject) {
-    // 没有截图（例如直接深链到结果页）时，窗里放品类名，不留一个空洞
-    ctx.fillStyle = skin.accent
-    ctx.globalAlpha = 0.5
-    ctx.font = `600 96px ${skin.titleFont}`
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillText(input.category, winCX, winCY)
-    ctx.globalAlpha = 1
-    ctx.textBaseline = 'top'
-  } else {
-    const iw = 'width' in input.bitmap ? input.bitmap.width : 0
-    const ih = 'height' in input.bitmap ? input.bitmap.height : 0
-    const s = input.subject
-    // 主体框稍微外扩，别把商品边缘贴死在窗口上
-    const pad = 0.06
-    const sx = Math.max(0, (s.x - pad) * iw)
-    const sy = Math.max(0, (s.y - pad) * ih)
-    const sw = Math.min(iw - sx, (s.w + pad * 2) * iw)
-    const sh = Math.min(ih - sy, (s.h + pad * 2) * ih)
-    // cover 进窗口
-    const scale = Math.max((winR * 2) / sw, (winR * 2) / sh)
-    const dw = sw * scale
-    const dh = sh * scale
-    ctx.drawImage(input.bitmap, sx, sy, sw, sh, winCX - dw / 2, winCY - dh / 2, dw, dh)
-  }
-  ctx.restore()
-
-  // 双线海棠框
+  // 内框：中式签文的双线边
   ctx.strokeStyle = skin.accent
-  ctx.lineWidth = 4
-  quatrefoil(ctx, winCX, winCY, winR)
-  ctx.stroke()
-  ctx.globalAlpha = 0.5
+  ctx.globalAlpha = 0.45
   ctx.lineWidth = 2
-  quatrefoil(ctx, winCX, winCY, winR - 16)
+  roundRect(ctx, slipX + 22, slipY + 22, slipW - 44, slipH - 44, 4)
   ctx.stroke()
   ctx.globalAlpha = 1
 
-  // ── 诗 ──
-  // 发疯文学/Galgame 的行数多（最多 9 行），字号要收，否则会顶到落款
-  const poemTop = 772
-  const lineCount = input.poem.lines.length
-  const poemSize = skin.vertical ? 46 : Math.min(40, Math.floor(300 / lineCount))
-  ctx.fillStyle = skin.ink
-  ctx.font = `400 ${poemSize}px ${skin.poemFont}`
+  const cx = W / 2
+  let y = slipY + 92
 
-  let poemBottom: number
-  if (skin.vertical) {
-    // 竖排整体居中：列数决定总宽；最长那列决定总高
-    const colGap = poemSize * 1.75
-    const totalW = (lineCount - 1) * colGap
-    drawVertical(ctx, input.poem.lines, W / 2 + totalW / 2, poemTop, poemSize)
-    const maxRows = Math.max(
-      ...input.poem.lines.map((l) => [...l.replace(/[，。、；：]$/, '')].length),
-    )
-    poemBottom = poemTop + maxRows * poemSize * 1.28
-  } else {
-    drawHorizontal(ctx, input.poem.lines, W / 2, poemTop, poemSize)
-    poemBottom = poemTop + lineCount * poemSize * 1.72
-  }
-
-  // ── 印章 ──
-  // 位置跟着诗块底部走，否则竖排的末列会压在章上
-  const sealSize = 76
-  const sealX = W / 2 - sealSize / 2
-  const sealY = Math.min(poemBottom + 26, H - 250)
+  // ── 成色 + 稀有度 ──
   ctx.fillStyle = skin.seal
-  ctx.beginPath()
-  ctx.roundRect(sealX, sealY, sealSize, sealSize, 10)
+  roundRect(ctx, slipX + 52, y - 36, 134, 54, 4)
   ctx.fill()
   ctx.fillStyle = '#ffffff'
-  ctx.font = `600 26px ${SERIF}`
+  ctx.font = `600 30px ${UI}`
+  ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  ctx.fillText('七夕', W / 2, sealY + sealSize / 2)
+  ctx.fillText(reading.fortune, slipX + 119, y - 8)
 
-  // ── 落款 ──
-  ctx.textBaseline = 'top'
+  ctx.textAlign = 'right'
+  ctx.fillStyle = skin.accent
+  ctx.font = `26px ${UI}`
+  ctx.fillText(
+    '★'.repeat(reading.rarity + 1) + '☆'.repeat(3 - reading.rarity),
+    slipX + slipW - 52,
+    y - 8,
+  )
+
+  // ── 星官名 ──
+  y += 130
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'alphabetic'
+  ctx.fillStyle = skin.ink
+  ctx.font = `500 108px ${KAI}`
+  ctx.fillText(reading.name, cx, y)
+  y += 46
+  ctx.font = `300 24px ${UI}`
+  ctx.globalAlpha = 0.5
+  ctx.fillText('星　官', cx, y)
+  ctx.globalAlpha = 1
+
+  // ── 星官图 ──
+  const chartR = 200
+  const chartCY = y + 230
+  ctx.save()
+  ctx.translate(cx, chartCY)
+  ctx.strokeStyle = skin.accent
+  ctx.globalAlpha = 0.8
+  ctx.lineWidth = 3
+  ctx.lineCap = 'round'
+  const pts = reading.stars.map((s) => ({ x: s.x * chartR * 2.3, y: -s.y * chartR * 2.3 }))
+  ctx.beginPath()
+  pts.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)))
+  ctx.stroke()
+  ctx.globalAlpha = 1
+  ctx.fillStyle = skin.ink
+  for (const p of pts) {
+    ctx.beginPath()
+    ctx.arc(p.x, p.y, 7, 0, Math.PI * 2)
+    ctx.fill()
+  }
+  ctx.font = `34px ${KAI}`
+  ctx.textAlign = 'center'
+  ctx.globalAlpha = 0.82
+  reading.stars.forEach((s, i) => ctx.fillText(s.text, pts[i].x, pts[i].y - 24))
+  ctx.globalAlpha = 1
+  ctx.restore()
+
+  y = chartCY + chartR + 40
+
+  // ── 心意类型 ──
   ctx.fillStyle = skin.ink
   ctx.globalAlpha = 0.72
   ctx.font = `300 30px ${UI}`
-  ctx.fillText('这份礼物，替我说给你听。', W / 2, H - 156)
-  ctx.globalAlpha = 0.42
-  ctx.font = `300 24px ${UI}`
-  ctx.fillText(`抖音商城 · 七夕  |  AI 礼物炼诗局  ·  ${input.category}`, W / 2, H - 96)
+  ctx.fillText(`你是${reading.persona}`, cx, y)
   ctx.globalAlpha = 1
 
-  const blob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob(resolve, 'image/png'),
-  )
-  if (!blob) throw new Error('POSTER_COMPOSE_FAILED')
+  // ── 分隔 ──
+  y += 46
+  ctx.strokeStyle = skin.ink
+  ctx.globalAlpha = 0.2
+  ctx.lineWidth = 2
+  ctx.setLineDash([8, 10])
+  ctx.beginPath()
+  ctx.moveTo(slipX + 90, y)
+  ctx.lineTo(slipX + slipW - 90, y)
+  ctx.stroke()
+  ctx.setLineDash([])
+  ctx.globalAlpha = 1
+
+  // ── 诗 ──
+  y += 68
+  ctx.fillStyle = skin.ink
+  ctx.font = `600 44px ${skin.titleFont}`
+  ctx.fillText(poem.title, cx, y)
+
+  // 行数多的文风（发疯/Galgame 最多 9 行）要自动收字号，否则会顶出签外
+  const lineSize = Math.max(26, Math.min(38, Math.floor(340 / poem.lines.length)))
+  ctx.font = `400 ${lineSize}px ${skin.poemFont}`
+  y += 20
+  for (const line of poem.lines) {
+    y += lineSize * 1.7
+    ctx.fillText(line, cx, y)
+  }
+
+  // ── 捞得的字 ──
+  ctx.font = `30px ${KAI}`
+  ctx.globalAlpha = 0.55
+  ctx.fillText(`捞得 · ${reading.stars.map((s) => s.text).join(' ')}`, cx, slipY + slipH - 116)
+  ctx.globalAlpha = 1
+
+  // ── 落款 ──
+  ctx.font = `300 24px ${UI}`
+  ctx.globalAlpha = 0.42
+  ctx.fillText(`抖音商城 · 七夕　${category}`, cx, slipY + slipH - 58)
+  ctx.globalAlpha = 1
+
+  // ── 签外一句话，留给转发时的第一眼 ──
+  ctx.fillStyle = '#f6efdc'
+  ctx.globalAlpha = 0.8
+  ctx.font = `300 30px ${UI}`
+  ctx.fillText('这份礼物，替我说给你听', cx, slipY + slipH + 96)
+  ctx.globalAlpha = 1
+
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
+  if (!blob) throw new Error('CHARM_COMPOSE_FAILED')
   return blob
 }

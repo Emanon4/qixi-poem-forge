@@ -1,4 +1,5 @@
 import { Program } from './Program'
+import { PostFX } from './PostFX'
 import { QUAD_VERT } from './glsl'
 
 export type QualityTier = 'high' | 'mid' | 'low'
@@ -19,6 +20,12 @@ export interface PointerState {
   vx: number
   vy: number
   down: boolean
+  /**
+   * 最近一次移动的时间戳（performance.now）。
+   * 命中判定要用它而不是瞬时速度：速度每帧按指数衰减，
+   * 手指慢慢挪的时候，判定那一刻速度可能已经衰减到 0，会漏判。
+   */
+  movedAt: number
 }
 
 export interface FrameCtx {
@@ -38,16 +45,32 @@ export interface FrameCtx {
 export interface Pass {
   readonly name: string
   enabled: boolean
+  /**
+   * 绘制顺序，小的先画。不给就按 ORDER.scene 处理。
+   * 有这个字段是因为：各幕通过 createQuadPass 追加自己的 pass，
+   * 单纯按数组顺序的话，后加的墨迹会盖住先加的粒子层。
+   */
+  order?: number
   draw(ctx: FrameCtx): void
   resize?(w: number, h: number): void
   dispose?(): void
 }
+
+/** 固定的层次约定。各幕的 pass 落在 scene 层，粒子和拖尾永远在最上。 */
+export const ORDER = {
+  sky: 0,
+  scene: 10,
+  particles: 20,
+  trail: 30,
+} as const
 
 export type Blend = 'none' | 'alpha' | 'add'
 
 /** 一个全屏 quad 的着色器 pass —— 星河、扫描、溶解、墨扩散都是这种形态。 */
 export class QuadPass implements Pass {
   enabled = true
+  // 显式标 number：ORDER 是 as const，直接赋值会把类型收窄成字面量 10
+  order: number = ORDER.scene
   readonly program: Program
 
   constructor(
@@ -81,6 +104,11 @@ export class QuadPass implements Pass {
 
 export class Renderer {
   readonly gl: WebGL2RenderingContext
+  /**
+   * HDR 辉光后处理。各幕的 pass 一律输出**线性 HDR**，
+   * 色调映射、暗角、抖动统一在这里落地成 8bit —— 不要在幕的 shader 里再做一遍。
+   */
+  readonly postFX: PostFX
   private readonly quadVbo: WebGLBuffer
   private readonly quadVaos = new Map<WebGLProgram, WebGLVertexArrayObject>()
   private readonly passes: Pass[] = []
@@ -96,7 +124,7 @@ export class Renderer {
   private dpr = 1
   tier: QualityTier = 'high'
 
-  readonly pointer: PointerState = { x: 0.5, y: 0.5, vx: 0, vy: 0, down: false }
+  readonly pointer: PointerState = { x: 0.5, y: 0.5, vx: 0, vy: 0, down: false, movedAt: 0 }
   private lastPointer = { x: 0.5, y: 0.5, t: 0 }
 
   /** FPS 治理：只降不升，避免在临界点来回抖动。 */
@@ -129,7 +157,10 @@ export class Renderer {
 
     gl.disable(gl.DEPTH_TEST)
     gl.disable(gl.CULL_FACE)
-    gl.clearColor(0.027, 0.024, 0.102, 1) // --night-900
+    gl.clearColor(0, 0, 0, 1) // 场景先进 HDR 目标，底色由天空 pass 铺满
+
+    // 必须在 resize() 之前建好：resize 会顺带调整后处理的所有渲染目标
+    this.postFX = new PostFX(this, gl)
 
     this.bindPointerEvents()
     this.resize()
@@ -139,6 +170,8 @@ export class Renderer {
 
   add(pass: Pass): void {
     this.passes.push(pass)
+    // 稳定排序：同 order 的保持加入先后，跨 order 的严格按层次
+    this.passes.sort((a, b) => (a.order ?? ORDER.scene) - (b.order ?? ORDER.scene))
     pass.resize?.(this.canvas.width, this.canvas.height)
   }
 
@@ -222,14 +255,19 @@ export class Renderer {
       pointer: this.pointer,
     }
 
-    const { gl } = this
-    gl.viewport(0, 0, this.canvas.width, this.canvas.height)
-    this.setBlend('none')
-    gl.clear(gl.COLOR_BUFFER_BIT)
+    this.drawFrame(ctx)
+  }
 
+  /**
+   * 一帧的完整流程：场景 pass 全部画进离屏 HDR 目标，
+   * 再由后处理跑辉光链并合成到屏幕。frame() 和 renderOnce() 共用。
+   */
+  private drawFrame(ctx: FrameCtx): void {
+    this.postFX.beginScene()
     for (const pass of this.passes) {
       if (pass.enabled) pass.draw(ctx)
     }
+    this.postFX.endScene(this.canvas.width, this.canvas.height)
   }
 
   start(): void {
@@ -255,11 +293,7 @@ export class Renderer {
       tier: this.tier,
       pointer: this.pointer,
     }
-    const { gl } = this
-    gl.viewport(0, 0, this.canvas.width, this.canvas.height)
-    this.setBlend('none')
-    gl.clear(gl.COLOR_BUFFER_BIT)
-    for (const pass of this.passes) if (pass.enabled) pass.draw(ctx)
+    this.drawFrame(ctx)
   }
 
   stop(): void {
@@ -305,6 +339,7 @@ export class Renderer {
 
     canvas.width = Math.round(cssW * dpr)
     canvas.height = Math.round(cssH * dpr)
+    this.postFX?.resize(canvas.width, canvas.height)
     for (const pass of this.passes) pass.resize?.(canvas.width, canvas.height)
   }
 
@@ -327,6 +362,7 @@ export class Renderer {
       this.lastPointer = { x, y, t: now }
       this.pointer.x = x
       this.pointer.y = y
+      this.pointer.movedAt = now
       if (down !== undefined) this.pointer.down = down
     }
 
@@ -353,6 +389,7 @@ export class Renderer {
 
   dispose(): void {
     this.stop()
+    this.postFX.dispose()
     for (const pass of this.passes) pass.dispose?.()
     this.passes.length = 0
     for (const vao of this.quadVaos.values()) this.gl.deleteVertexArray(vao)

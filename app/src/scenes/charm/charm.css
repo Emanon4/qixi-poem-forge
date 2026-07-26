@@ -1,0 +1,206 @@
+.charm {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-ui);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(16 * var(--su));
+  padding: calc(var(--safe-t) + 28 * var(--su)) calc(22 * var(--su))
+    calc(var(--safe-b) + 22 * var(--su));
+  text-align: center;
+  perspective: 900px;
+}
+
+/* ── 签 ─────────────────────────────────────────────────
+   竖长条 + 双线内框 + 顶部挂绳孔，读作御守 / 签文，
+   而不是又一张圆角卡片。 */
+
+.charm__slip {
+  position: relative;
+  width: 100%;
+  max-width: calc(300 * var(--su));
+  padding: calc(26 * var(--su)) calc(22 * var(--su)) calc(20 * var(--su));
+  background:
+    radial-gradient(120% 60% at 50% 0%, rgb(255 255 255 / 22%) 0%, transparent 60%),
+    color-mix(in oklab, var(--skin-paper) 96%, transparent);
+  border-radius: calc(4 * var(--su));
+  box-shadow:
+    0 calc(24 * var(--su)) calc(56 * var(--su)) rgb(0 0 0 / 55%),
+    0 0 0 1px color-mix(in oklab, var(--skin-accent) 40%, transparent);
+}
+
+/* 内框：中式签文的双线边 */
+.charm__slip::before {
+  content: '';
+  position: absolute;
+  inset: calc(7 * var(--su));
+  border: 1px solid color-mix(in oklab, var(--skin-accent) 42%, transparent);
+  border-radius: calc(2 * var(--su));
+  pointer-events: none;
+}
+
+.charm__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: calc(11 * var(--su));
+  color: color-mix(in oklab, var(--skin-ink) 60%, transparent);
+}
+
+.charm__fortune {
+  padding: calc(3 * var(--su)) calc(10 * var(--su));
+  border-radius: calc(2 * var(--su));
+  background: var(--skin-seal);
+  color: #fff;
+  letter-spacing: calc(2 * var(--su));
+  text-indent: calc(2 * var(--su));
+}
+
+.charm__rarity {
+  letter-spacing: calc(1.5 * var(--su));
+  color: var(--skin-accent);
+}
+
+.charm__name {
+  margin-top: calc(14 * var(--su));
+  font-family: var(--font-kai);
+  font-size: calc(38 * var(--su));
+  font-weight: 500;
+  letter-spacing: calc(8 * var(--su));
+  text-indent: calc(8 * var(--su));
+  color: var(--skin-ink);
+}
+
+.charm__name small {
+  display: block;
+  margin-top: calc(2 * var(--su));
+  font-family: var(--font-ui);
+  font-size: calc(10 * var(--su));
+  font-weight: 300;
+  letter-spacing: calc(5 * var(--su));
+  text-indent: calc(5 * var(--su));
+  color: color-mix(in oklab, var(--skin-ink) 45%, transparent);
+}
+
+.charm__chart {
+  width: calc(150 * var(--su));
+  height: calc(150 * var(--su));
+  margin: calc(6 * var(--su)) auto calc(2 * var(--su));
+  overflow: visible;
+}
+
+.charm__chart line {
+  stroke: color-mix(in oklab, var(--skin-accent) 75%, transparent);
+  stroke-width: 0.5;
+  stroke-linecap: round;
+}
+
+.charm__chart circle {
+  fill: var(--skin-ink);
+}
+
+.charm__persona {
+  font-size: calc(12.5 * var(--su));
+  line-height: 1.8;
+  color: color-mix(in oklab, var(--skin-ink) 70%, transparent);
+}
+
+.charm__persona em {
+  font-style: normal;
+  font-weight: 600;
+  color: var(--skin-ink);
+  border-bottom: 1px solid color-mix(in oklab, var(--skin-seal) 60%, transparent);
+  padding-bottom: calc(1 * var(--su));
+}
+
+.charm__poem {
+  margin-top: calc(16 * var(--su));
+  padding-top: calc(14 * var(--su));
+  border-top: 1px dashed color-mix(in oklab, var(--skin-ink) 22%, transparent);
+}
+
+.charm__poem h3 {
+  font-family: var(--font-display);
+  font-size: calc(16 * var(--su));
+  font-weight: 600;
+  letter-spacing: calc(1.6 * var(--su));
+  color: var(--skin-ink);
+  margin-bottom: calc(8 * var(--su));
+}
+
+.charm__poem p {
+  font-family: var(--font-poem);
+  font-size: calc(13.5 * var(--su));
+  line-height: 1.95;
+  letter-spacing: calc(1.2 * var(--su));
+  color: var(--skin-ink);
+}
+
+.charm__words {
+  margin-top: calc(14 * var(--su));
+  font-family: var(--font-kai);
+  font-size: calc(11.5 * var(--su));
+  letter-spacing: calc(2 * var(--su));
+  color: color-mix(in oklab, var(--skin-ink) 55%, transparent);
+}
+
+.charm__sign {
+  margin-top: calc(8 * var(--su));
+  font-size: calc(9.5 * var(--su));
+  letter-spacing: calc(0.8 * var(--su));
+  color: color-mix(in oklab, var(--skin-ink) 38%, transparent);
+}
+
+/* ── 预览与操作 ─────────────────────────────────────────── */
+
+.charm__preview {
+  width: calc(120 * var(--su));
+}
+
+.charm__preview img {
+  width: 100%;
+  border-radius: calc(6 * var(--su));
+  box-shadow: 0 calc(8 * var(--su)) calc(24 * var(--su)) rgb(0 0 0 / 55%);
+}
+
+.charm__preview p {
+  margin-top: calc(6 * var(--su));
+  font-size: calc(10 * var(--su));
+  color: var(--ink-faint);
+}
+
+.charm__actions {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(9 * var(--su));
+}
+
+.charm__cta {
+  flex: 1 0 100%;
+  padding: calc(14 * var(--su)) 0;
+  border-radius: calc(999 * var(--su));
+  font-size: calc(15 * var(--su));
+  letter-spacing: calc(3 * var(--su));
+  text-indent: calc(3 * var(--su));
+  color: #241a10;
+  background: linear-gradient(135deg, var(--gold-300), var(--peach-300));
+  box-shadow: 0 calc(6 * var(--su)) calc(24 * var(--su)) rgb(0 0 0 / 40%);
+}
+
+.charm__ghost {
+  flex: 1;
+  padding: calc(11 * var(--su)) 0;
+  border-radius: calc(999 * var(--su));
+  font-size: calc(12.5 * var(--su));
+  color: var(--moon-200);
+  border: 1px solid var(--hairline);
+  background: rgb(12 8 30 / 55%);
+}
+
+.charm__cta:active,
+.charm__ghost:active {
+  transform: scale(0.98);
+}

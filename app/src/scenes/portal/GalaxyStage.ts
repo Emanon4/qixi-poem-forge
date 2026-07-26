@@ -1,6 +1,7 @@
 import gsap from 'gsap'
-import { Renderer } from '@/gl/Renderer'
+import { ORDER, Renderer } from '@/gl/Renderer'
 import { StarTrailPass } from '@/gl/StarTrailPass'
+import { InstancedParticles } from '@/gl/InstancedParticles'
 import { GALAXY_COMPOSITION, GALAXY_FRAG } from '@/shaders/galaxy'
 
 /**
@@ -20,6 +21,11 @@ export class GalaxyStage {
    * 拆成 r/g/b 三个独立数值而不是数组，是为了让 gsap 能逐通道补间。
    */
   readonly tint = { r: 1, g: 1, b: 1, amount: 0 }
+  /**
+   * 跨幕共用的粒子层。各幕只改 mode / phase / instances，不重建 pass ——
+   * 重建要重新分配 VBO 和 VAO，切幕时会掉帧。
+   */
+  readonly particles: InstancedParticles
   private readonly trail: StarTrailPass
   private readonly resizeObserver: ResizeObserver
   private introTween?: gsap.core.Tween
@@ -30,7 +36,7 @@ export class GalaxyStage {
     // 先建拖尾（天空 pass 的 uniform 回调要读它的 energy），但后挂，保证画在天空之上
     this.trail = new StarTrailPass(this.renderer)
 
-    this.renderer.createQuadPass('galaxy', GALAXY_FRAG, (program) => {
+    const galaxy = this.renderer.createQuadPass('galaxy', GALAXY_FRAG, (program) => {
       program
         .uni('uIntro', this.intro.value)
         .uni('uHorizonFrac', GALAXY_COMPOSITION.horizonFrac)
@@ -39,7 +45,12 @@ export class GalaxyStage {
         .uni('uTint', [this.tint.r, this.tint.g, this.tint.b])
         .uni('uTintAmount', this.tint.amount)
     })
+    galaxy.order = ORDER.sky // 天空永远垫底
     this.renderer.add(this.trail)
+
+    this.particles = new InstancedParticles('particles', this.renderer, 4000)
+    this.particles.enabled = false // 各幕按需打开
+    this.renderer.add(this.particles)
 
     this.resizeObserver = new ResizeObserver(() => this.renderer.resize())
     this.resizeObserver.observe(canvas)

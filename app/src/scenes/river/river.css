@@ -1,0 +1,159 @@
+.river {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-ui);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: calc(var(--safe-t) + 52 * var(--su)) calc(20 * var(--su))
+    calc(var(--safe-b) + 26 * var(--su));
+  text-align: center;
+  /* 整层不吃事件：捞的判定走 canvas 上的触点，字本身不该拦截 */
+  pointer-events: none;
+}
+
+/* ── 题头 ───────────────────────────────────────────────── */
+
+.river__head {
+  position: relative;
+}
+
+.river__eyebrow {
+  font-size: calc(10.5 * var(--su));
+  letter-spacing: calc(4 * var(--su));
+  text-indent: calc(4 * var(--su));
+  color: var(--ink-faint);
+}
+
+.river__title {
+  margin-top: calc(12 * var(--su));
+  font-family: var(--font-kai);
+  font-size: calc(24 * var(--su));
+  font-weight: 500;
+  letter-spacing: calc(2 * var(--su));
+  color: var(--moon-100);
+  text-shadow: 0 calc(2 * var(--su)) calc(16 * var(--su)) rgb(8 5 22 / 85%);
+}
+
+.river__title em {
+  font-style: normal;
+  font-size: calc(30 * var(--su));
+  color: var(--gold-300);
+  padding: 0 calc(3 * var(--su));
+}
+
+.river__hint {
+  margin-top: calc(10 * var(--su));
+  font-size: calc(12 * var(--su));
+  font-weight: 300;
+  letter-spacing: calc(1.4 * var(--su));
+  color: var(--ink-dim);
+}
+
+/* ── 漂浮的字 ───────────────────────────────────────────── */
+
+.river__layer {
+  position: absolute;
+  inset: 0;
+  /* 位置由 rAF 直接写 transform；这层不参与 flex 布局 */
+}
+
+.river__word {
+  position: absolute;
+  top: 0;
+  left: 0;
+  /* 入场走 CSS 而不是 gsap —— 见 RiverScene 里的说明 */
+  animation: river-appear 0.7s var(--ease-spring) backwards;
+  font-family: var(--font-kai);
+  font-size: calc(27 * var(--su));
+  line-height: 1;
+  color: var(--moon-200);
+  text-shadow:
+    0 0 calc(16 * var(--su)) rgb(180 200 255 / 45%),
+    0 calc(1 * var(--su)) calc(6 * var(--su)) rgb(6 4 18 / 70%);
+  will-change: transform;
+}
+
+/* 来自用户截图的字 —— 金色，更大，带光晕。
+   「这是我的截图变出来的字」是整个体验私人感的来源，必须一眼认出。 */
+.river__word--object {
+  font-size: calc(32 * var(--su));
+  font-weight: 600;
+  color: var(--gold-300);
+  text-shadow:
+    0 0 calc(22 * var(--su)) rgb(240 200 120 / 75%),
+    0 calc(1 * var(--su)) calc(6 * var(--su)) rgb(6 4 18 / 70%);
+}
+
+.river__word--feeling {
+  color: var(--peach-300);
+  text-shadow:
+    0 0 calc(18 * var(--su)) rgb(247 195 210 / 50%),
+    0 calc(1 * var(--su)) calc(6 * var(--su)) rgb(6 4 18 / 70%);
+}
+
+/* 语气字压小压淡：它们是配角，抢眼会打乱捞取的注意力 */
+.river__word--tone {
+  font-size: calc(21 * var(--su));
+  color: var(--ink-dim);
+}
+
+/* ── 底部的篮子 ─────────────────────────────────────────── */
+
+.river__basket {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  gap: calc(7 * var(--su));
+}
+
+.river__slot {
+  display: grid;
+  place-items: center;
+  width: calc(36 * var(--su));
+  height: calc(44 * var(--su));
+  border-radius: calc(6 * var(--su));
+  border: 1px solid var(--hairline);
+  background: rgb(12 8 30 / 45%);
+  backdrop-filter: blur(calc(8 * var(--su)));
+  -webkit-backdrop-filter: blur(calc(8 * var(--su)));
+  font-family: var(--font-kai);
+  font-size: calc(22 * var(--su));
+  color: var(--moon-100);
+  transition:
+    border-color 0.3s var(--ease-out-soft),
+    background 0.3s var(--ease-out-soft);
+}
+
+.river__slot.is-filled {
+  border-color: color-mix(in oklab, var(--gold-300) 70%, transparent);
+  background: rgb(40 30 18 / 55%);
+  box-shadow: 0 0 calc(16 * var(--su)) rgb(233 196 106 / 30%);
+  animation: river-land 0.42s var(--ease-spring);
+}
+
+@keyframes river-land {
+  from {
+    transform: scale(0.4) translateY(calc(-14 * var(--su)));
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+
+@keyframes river-appear {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 每个字错开一点入场，一河的字是「浮上来」而不是「一起闪现」 */
+.river__word:nth-child(3n) { animation-delay: 0.12s; }
+.river__word:nth-child(3n + 1) { animation-delay: 0.26s; }
+.river__word:nth-child(3n + 2) { animation-delay: 0.4s; }

@@ -134,10 +134,12 @@ vec3 moonLayer(vec2 p, vec2 center, float r, int oct) {
   float craters = fbm(mp * 34.0 + 4.2, max(oct - 2, 2));
   float shade = mix(0.62, 1.06, craters);
   float limb = 0.70 + 0.30 * smoothstep(r, r * 0.15, d); // 边缘压暗，读起来是球不是贴纸
-  vec3 body = srgb2lin(vec3(1.0, 0.941, 0.788)) * shade * limb * 0.88;
+  vec3 body = srgb2lin(vec3(1.0, 0.941, 0.788)) * shade * limb * 1.35;
 
   // 双段光晕：近处收得紧，远处铺得开。别给太满，否则整片天空被它抬平。
-  float halo = exp(-d / (r * 0.80)) * 0.42 + exp(-d / (r * 3.2)) * 0.15;
+  // 自带光晕收窄：外溢交给后处理的辉光去做，两边都给足会把右上角糊掉。
+  // 这里只保留贴着月盘的一圈，负责「月亮本身在发光」这个读数。
+  float halo = exp(-d / (r * 0.62)) * 0.34 + exp(-d / (r * 2.4)) * 0.07;
   vec3 haloCol = srgb2lin(vec3(1.0, 0.882, 0.706)) * halo;
 
   return body * disc + haloCol * (1.0 - disc * 0.65);
@@ -230,8 +232,8 @@ vec3 skyStack(vec2 p, float horizonY, vec2 moonC, int oct, float starGate, float
 
   // 靠近地平线的星星被大气吃掉
   float extinction = smoothstep(horizonY + 0.01, yAt(uHorizonFrac + 0.14), p.y);
-  col += srgb2lin(vec3(1.0, 0.965, 0.905)) * (stars * 1.15 + glints * 1.9) * extinction * starGate;
-  col += srgb2lin(vec3(1.0, 0.94, 0.86)) * meteors(p) * 2.2 * starGate;
+  col += srgb2lin(vec3(1.0, 0.965, 0.905)) * (stars * 1.25 + glints * 3.4) * extinction * starGate;
+  col += srgb2lin(vec3(1.0, 0.94, 0.86)) * meteors(p) * 5.0 * starGate;
   col += moonLayer(p, moonC, uMoon.z, oct) * moonGate;
   return col;
 }
@@ -264,7 +266,7 @@ vec3 waterLayer(vec2 p, float horizonY, vec2 moonC, int oct, float starGate, flo
   float g2 = vnoise(vec2(p.x * 130.0 + 4.3, p.y * 320.0 - uTime * 2.7));
   float glitter = lane * (pow(g1, 7.0) * 2.0 + pow(g2, 9.0) * 1.3)
                 * smoothstep(0.0, 0.05, depth) * smoothstep(0.60, 0.10, depth);
-  water += srgb2lin(vec3(1.0, 0.93, 0.78)) * glitter * moonGate;
+  water += srgb2lin(vec3(1.0, 0.93, 0.78)) * glitter * 1.9 * moonGate;
 
   // 近岸（画面最下缘）压得更狠：既把视线推回中央，也给底部说明文字留出可读的底
   return water * (1.0 - smoothstep(0.08, 0.40, depth) * 0.74);
@@ -294,6 +296,9 @@ void main() {
   // 水平线上一道薄雾，把天与水焊在一起
   col += srgb2lin(vec3(0.85, 0.66, 0.66)) * exp(-pow((p.y - horizonY) / 0.030, 2.0)) * 0.10;
 
+  // ↓ 从这里往下不再做色调映射：本 pass 输出线性 HDR，
+  //   ACES / 暗角 / 抖动统一由 PostFX 合成时落地。
+
   // 手指划过时整体微微提亮，交互有「触到星河」的实感
   col *= 1.0 + uEnergy * 0.14;
 
@@ -312,14 +317,7 @@ void main() {
     col = mix(col, tinted, uTintAmount);
   }
 
-  // 暗角
-  vec2 v = (vUV - 0.5) * vec2(1.06, 1.0);
-  col *= 1.0 - 0.44 * pow(clamp(length(v) * 1.42, 0.0, 1.0), 2.1);
-
-  col = aces(col * mix(0.15, 0.86, intro));
-  col = lin2srgb(col);
-  col = dither(col, gl_FragCoord.xy);
-  fragColor = vec4(col, 1.0);
+  fragColor = vec4(col * mix(0.12, 1.0, intro), 1.0);
 }
 `,
   FULL_KIT,

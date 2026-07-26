@@ -1,12 +1,15 @@
 import { create } from 'zustand'
-import type { PurposeId, RecipientId, StyleId } from '@/design/catalog'
+import type { Reading } from '@/game/constellation'
 import type { SubjectBox } from '@/vision/subject'
 
-/** 五幕。玩法B（拼贴诗）复用 upload/forge/result，只把 choose 换成 salvage。 */
-export type Act = 'portal' | 'awaken' | 'choose' | 'salvage' | 'forge' | 'result'
-
-/** 两条玩法路径。 */
-export type Playbook = 'choice' | 'collage'
+/**
+ * 《捞星记》的五幕。
+ * portal 投递 → awaken 唤醒 → river 捞星 → constellation 连星成诗 → charm 心意签
+ *
+ * 旧的 choose/forge/result 三幕已被 river/constellation/charm 取代：
+ * 原来的「三道选择题」是填表不是游戏，没有重玩理由，也不构成可分享的身份物件。
+ */
+export type Act = 'portal' | 'awaken' | 'river' | 'constellation' | 'charm'
 
 export interface Screenshot {
   file: File
@@ -18,7 +21,6 @@ export interface Screenshot {
 
 interface FlowState {
   act: Act
-  playbook: Playbook
   screenshot: Screenshot | null
 
   /** 第1幕定位出的商品主体框（CPU 启发式，非分割模型） */
@@ -31,39 +33,35 @@ interface FlowState {
    */
   knownCategory: string | null
 
-  recipient: RecipientId | null
-  purpose: PurposeId | null
-  style: StyleId
+  /** 捞到的七枚字 */
+  caught: string[]
+  /** 读星结果。连星幕和心意签幕都由它驱动 */
+  reading: Reading | null
 
   setAct: (act: Act) => void
-  setPlaybook: (playbook: Playbook) => void
   setScreenshot: (screenshot: Screenshot | null) => void
+  setCaught: (caught: string[]) => void
+  setReading: (reading: Reading) => void
   setSubject: (subject: SubjectBox) => void
   setCategory: (category: string) => void
   setKnownCategory: (category: string | null) => void
-  setRecipient: (recipient: RecipientId) => void
-  setPurpose: (purpose: PurposeId) => void
-  setStyle: (style: StyleId) => void
   reset: () => void
 }
 
 const INITIAL = {
   act: 'portal' as Act,
-  playbook: 'choice' as Playbook,
   screenshot: null,
   subject: null,
   category: '项链',
   knownCategory: null,
-  recipient: null,
-  purpose: null,
-  style: 'guofeng' as StyleId,
+  caught: [] as string[],
+  reading: null,
 }
 
 export const useFlow = create<FlowState>((set, get) => ({
   ...INITIAL,
 
   setAct: (act) => set({ act }),
-  setPlaybook: (playbook) => set({ playbook }),
 
   setScreenshot: (screenshot) => {
     // 换图前把上一张的 blob URL 释放掉，反复试玩不会漏内存
@@ -75,9 +73,8 @@ export const useFlow = create<FlowState>((set, get) => ({
   setSubject: (subject) => set({ subject }),
   setCategory: (category) => set({ category }),
   setKnownCategory: (knownCategory) => set({ knownCategory }),
-  setRecipient: (recipient) => set({ recipient }),
-  setPurpose: (purpose) => set({ purpose }),
-  setStyle: (style) => set({ style }),
+  setCaught: (caught) => set({ caught }),
+  setReading: (reading) => set({ reading }),
 
   reset: () => {
     const previous = get().screenshot

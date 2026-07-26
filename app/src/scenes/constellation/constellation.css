@@ -1,0 +1,157 @@
+.cons {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-ui);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: calc(var(--safe-t) + 40 * var(--su)) calc(20 * var(--su))
+    calc(var(--safe-b) + 24 * var(--su));
+  text-align: center;
+  pointer-events: none;
+}
+
+/* ── 星官图 ─────────────────────────────────────────────── */
+
+.cons__chart {
+  position: relative;
+  width: calc(300 * var(--su));
+  height: calc(240 * var(--su));
+  flex: none;
+}
+
+.cons__chart svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* 连线：手绘星图的那种细金线，不要发光过头 */
+.cons__link {
+  fill: none;
+  stroke: var(--gold-300);
+  stroke-width: 0.4;
+  stroke-linecap: round;
+  opacity: 0;
+  filter: drop-shadow(0 0 1px rgb(240 200 120 / 80%));
+}
+
+.cons__star {
+  fill: var(--moon-100);
+  filter: drop-shadow(0 0 2.4px rgb(255 240 200 / 95%));
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* 星旁的字。星图上每颗星都该有名字。 */
+.cons__starLabel {
+  position: absolute;
+  transform: translate(-50%, -50%) translateY(calc(-16 * var(--su)));
+  font-family: var(--font-kai);
+  font-size: calc(17 * var(--su));
+  color: var(--moon-200);
+  text-shadow: 0 0 calc(10 * var(--su)) rgb(6 4 18 / 90%);
+  white-space: nowrap;
+}
+
+/* ── 星官名与成色 ───────────────────────────────────────── */
+
+.cons__caption {
+  margin-top: calc(-4 * var(--su));
+}
+
+.cons__name {
+  font-family: var(--font-kai);
+  font-size: calc(30 * var(--su));
+  font-weight: 500;
+  letter-spacing: calc(6 * var(--su));
+  text-indent: calc(6 * var(--su));
+  color: var(--moon-100);
+  text-shadow: 0 calc(2 * var(--su)) calc(20 * var(--su)) rgb(8 5 22 / 90%);
+}
+
+.cons__name small {
+  display: block;
+  margin-top: calc(4 * var(--su));
+  font-family: var(--font-ui);
+  font-size: calc(11 * var(--su));
+  font-weight: 300;
+  letter-spacing: calc(5 * var(--su));
+  text-indent: calc(5 * var(--su));
+  color: var(--ink-faint);
+}
+
+.cons__fortune {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(7 * var(--su));
+  margin-top: calc(12 * var(--su));
+  padding: calc(5 * var(--su)) calc(14 * var(--su));
+  border-radius: calc(999 * var(--su));
+  border: 1px solid color-mix(in oklab, var(--gold-300) 45%, transparent);
+  background: rgb(38 28 16 / 55%);
+  font-size: calc(12.5 * var(--su));
+  letter-spacing: calc(1.5 * var(--su));
+  color: var(--gold-300);
+}
+
+.cons__fortune i {
+  font-style: normal;
+  font-size: calc(10 * var(--su));
+  letter-spacing: calc(1 * var(--su));
+}
+
+/* ── 诗 ─────────────────────────────────────────────────── */
+
+.cons__poem {
+  /* 诗要落在墨迹诗笺的中心。墨心在 byWidth y = -0.46，
+     换算到屏幕大约是 68% 处，这里的上边距就是照着它对的。 */
+  margin-top: calc(40 * var(--su));
+  flex: 1;
+}
+
+.cons__title {
+  font-family: var(--font-display);
+  font-size: calc(18 * var(--su));
+  font-weight: 600;
+  letter-spacing: calc(2 * var(--su));
+  color: var(--skin-ink);
+  margin-bottom: calc(10 * var(--su));
+}
+
+.cons__line {
+  font-family: var(--font-poem);
+  font-size: calc(14.5 * var(--su));
+  line-height: 1.95;
+  letter-spacing: calc(1.4 * var(--su));
+  color: var(--skin-ink);
+}
+
+/* 逐字落位。初始态写在 CSS 里，gsap 只负责推到终态 */
+.cons__ch {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(calc(10 * var(--su)));
+  filter: blur(calc(3 * var(--su)));
+}
+
+/* ── 按钮 ───────────────────────────────────────────────── */
+
+.cons__cta {
+  pointer-events: auto;
+  width: 100%;
+  padding: calc(15 * var(--su)) 0;
+  border-radius: calc(999 * var(--su));
+  font-size: calc(15.5 * var(--su));
+  letter-spacing: calc(3 * var(--su));
+  text-indent: calc(3 * var(--su));
+  color: #241a10;
+  background: linear-gradient(135deg, var(--gold-300), var(--peach-300));
+  box-shadow: 0 calc(6 * var(--su)) calc(26 * var(--su)) rgb(0 0 0 / 40%);
+}
+
+.cons__cta:active {
+  transform: scale(0.98);
+}
