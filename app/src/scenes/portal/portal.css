@@ -1,0 +1,252 @@
+.portal {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-ui);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: calc(var(--safe-t) + 66 * var(--su)) calc(24 * var(--su))
+    calc(var(--safe-b) + 34 * var(--su));
+  text-align: center;
+  /* 整层不吃事件，触点直穿到 canvas —— 星尘拖尾才跟手 */
+  pointer-events: none;
+}
+
+/* ── 标题组 ─────────────────────────────────────────────── */
+
+.portal__head {
+  position: relative;
+}
+
+/* 极淡的椭圆压暗，保证文字压在银河上也读得清，又不显出方框 */
+.portal__head::before {
+  content: '';
+  position: absolute;
+  inset: calc(-40 * var(--su)) calc(-60 * var(--su));
+  background: radial-gradient(
+    58% 50% at 50% 44%,
+    rgb(10 6 26 / 42%) 0%,
+    rgb(10 6 26 / 18%) 52%,
+    transparent 78%
+  );
+  z-index: var(--z-scrim);
+}
+
+.portal__eyebrow {
+  font-size: calc(11 * var(--su));
+  font-weight: 300;
+  letter-spacing: calc(3.4 * var(--su));
+  /* 抵消末字后面的字距，视觉才真居中 */
+  text-indent: calc(3.4 * var(--su));
+  color: var(--ink-faint);
+}
+
+.portal__title-sm {
+  margin-top: calc(20 * var(--su));
+  font-size: calc(15 * var(--su));
+  font-weight: 300;
+  letter-spacing: calc(7 * var(--su));
+  text-indent: calc(7 * var(--su));
+  color: var(--gold-300);
+  text-shadow: 0 0 calc(18 * var(--su)) rgb(233 196 106 / 45%);
+}
+
+.portal__title-lg {
+  margin-top: calc(8 * var(--su));
+  font-family: var(--font-serif);
+  font-size: calc(46 * var(--su));
+  font-weight: 600;
+  letter-spacing: calc(5 * var(--su));
+  text-indent: calc(5 * var(--su));
+  line-height: 1.16;
+  color: var(--moon-100);
+  text-shadow:
+    0 0 calc(34 * var(--su)) rgb(255 240 210 / 32%),
+    0 calc(2 * var(--su)) calc(12 * var(--su)) rgb(14 8 32 / 60%);
+}
+
+.portal__sub {
+  margin-top: calc(18 * var(--su));
+  font-size: calc(13 * var(--su));
+  font-weight: 300;
+  line-height: 2;
+  letter-spacing: calc(1.8 * var(--su));
+  color: var(--ink-dim);
+}
+
+/* ── 海棠窗上传口 ────────────────────────────────────────── */
+
+.portal__gate {
+  position: relative;
+  width: calc(216 * var(--su));
+  height: calc(216 * var(--su));
+  /* 只有这一块吃事件 */
+  pointer-events: auto;
+}
+
+.portal__halo {
+  position: absolute;
+  inset: calc(-58 * var(--su));
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgb(255 226 172 / 30%) 0%,
+    rgb(247 195 210 / 15%) 38%,
+    transparent 68%
+  );
+  filter: blur(calc(5 * var(--su)));
+  animation: portal-breathe 3.6s var(--ease-in-out-soft) infinite;
+  will-change: transform, opacity;
+}
+
+@keyframes portal-breathe {
+  0%,
+  100% {
+    opacity: 0.66;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.07);
+  }
+}
+
+.portal__window {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.portal__frame {
+  fill: none;
+  stroke-linejoin: round;
+}
+
+/* stroke-width 是 viewBox 单位（宽 200），所以 1.6 ≈ 1.7 物理 su */
+.portal__frame--outer {
+  stroke: rgb(245 223 168 / 88%);
+  stroke-width: 1.6;
+  filter: drop-shadow(0 0 calc(3 * var(--su)) rgb(255 220 160 / 65%));
+}
+
+.portal__frame--inner {
+  stroke: rgb(255 251 240 / 42%);
+  stroke-width: 0.7;
+}
+
+.portal__shot {
+  /* SVG <image> 要显式给 transform-box，scale 才绕自身中心 */
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.portal__glyph {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.portal__glyph svg {
+  width: calc(46 * var(--su));
+  height: calc(46 * var(--su));
+  fill: none;
+  stroke: var(--gold-300);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 calc(4 * var(--su)) rgb(233 196 106 / 55%));
+}
+
+.portal__gate-label {
+  position: absolute;
+  left: 50%;
+  bottom: calc(-30 * var(--su));
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: calc(13 * var(--su));
+  letter-spacing: calc(2 * var(--su));
+  text-indent: calc(2 * var(--su));
+  color: var(--moon-200);
+  text-shadow: 0 calc(1 * var(--su)) calc(8 * var(--su)) rgb(14 8 32 / 70%);
+}
+
+/* 按下时整个窗微微内收，给出物理反馈 */
+.portal__gate:active .portal__window,
+.portal__gate:active .portal__glyph {
+  transform: scale(0.96);
+  transition: transform 0.12s var(--ease-out-soft);
+}
+
+/* ── 底部说明 ───────────────────────────────────────────── */
+
+.portal__foot {
+  position: relative;
+  font-size: calc(11.5 * var(--su));
+  font-weight: 300;
+  line-height: 2;
+  letter-spacing: calc(1.2 * var(--su));
+  color: var(--ink-faint);
+}
+
+/* 底部说明压在被月光照亮的水面上，需要一层压暗才读得清 */
+.portal__foot::before {
+  content: '';
+  position: absolute;
+  inset: calc(-18 * var(--su)) calc(-90 * var(--su));
+  background: radial-gradient(
+    62% 54% at 50% 50%,
+    rgb(8 5 22 / 82%) 0%,
+    rgb(8 5 22 / 46%) 52%,
+    transparent 82%
+  );
+  z-index: var(--z-scrim);
+}
+
+.portal__next {
+  color: var(--ink-dim);
+}
+
+.portal__next span {
+  font-size: calc(10.5 * var(--su));
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.portal__error {
+  color: var(--peach-300);
+}
+
+/* 示例截图入口 */
+.portal__samples {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: calc(7 * var(--su));
+  margin-top: calc(10 * var(--su));
+  pointer-events: auto;
+}
+
+.portal__samples span {
+  font-size: calc(11 * var(--su));
+  color: var(--ink-faint);
+}
+
+.portal__samples button {
+  padding: calc(6 * var(--su)) calc(13 * var(--su));
+  border-radius: calc(999 * var(--su));
+  font-size: calc(11.5 * var(--su));
+  letter-spacing: calc(0.6 * var(--su));
+  color: var(--moon-200);
+  border: 1px solid var(--hairline);
+  background: rgb(255 255 255 / 6%);
+}
+
+.portal__samples button:active {
+  transform: scale(0.96);
+  background: rgb(255 255 255 / 14%);
+}

@@ -1,0 +1,35 @@
+#root {
+  display: grid;
+  place-items: center;
+  background: #05040f;
+}
+
+.frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  /* --su 的换算基准。没有它，桌面边框里的尺寸会跟着浏览器窗口跑。 */
+  container-type: size;
+}
+
+/* 桌面/平板：套手机边框居中。分享给客户时电脑上点开也是对的比例。 */
+@media (min-width: 720px) and (min-height: 640px) {
+  #root {
+    background:
+      radial-gradient(60% 50% at 50% 40%, #14102c 0%, transparent 70%),
+      #05040f;
+  }
+
+  .frame {
+    width: auto;
+    height: min(932px, 94dvh);
+    aspect-ratio: 430 / 932;
+    border-radius: 46px;
+    box-shadow:
+      0 0 0 10px #17141f,
+      0 0 0 11px #2e2a3a,
+      0 40px 90px -20px rgb(0 0 0 / 80%),
+      0 0 120px -30px rgb(120 90 200 / 35%);
+  }
+}

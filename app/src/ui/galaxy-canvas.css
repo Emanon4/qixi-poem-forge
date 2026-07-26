@@ -1,0 +1,30 @@
+.galaxy-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-gl);
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+
+/* WebGL2 不可用时的兜底夜空：静态的，但色彩关系和 shader 版一致 */
+.galaxy-canvas--degraded {
+  background:
+    radial-gradient(
+      42% 22% at 71% 22%,
+      rgb(255 245 220 / 65%) 0%,
+      rgb(255 226 186 / 22%) 38%,
+      transparent 70%
+    ),
+    radial-gradient(120% 55% at 50% 100%, rgb(173 111 115 / 55%) 0%, transparent 62%),
+    linear-gradient(
+      to top,
+      #7b4f56 0%,
+      #6b3f6a 8%,
+      #492f73 24%,
+      #2a1f55 46%,
+      #0e0b2a 74%,
+      #07061a 100%
+    );
+}

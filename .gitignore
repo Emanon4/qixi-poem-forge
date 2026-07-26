@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+
+# 客户资料不进仓库：飞书效果图 / brief 属于客户未发布素材
+七夕大促AI写诗特效参考/
+七夕抖音AI写诗特效-项目背景上下文.md
+七夕H5-单文件版.html

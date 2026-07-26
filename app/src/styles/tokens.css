@@ -1,0 +1,145 @@
+/* ══════════════════════════════════════════════════════════════
+   设计令牌 · AI 七夕礼物炼诗局
+   ──────────────────────────────────────────────────────────────
+   三层结构，从外到内层层覆盖：
+     1) 夜色基底  —— 全程不变的舞台底色（银河渡口的墨蓝暮紫月白）
+     2) 对象色系  —— [data-recipient] 决定，来自创意文档「按送给谁定色系」
+     3) 文风皮肤  —— [data-skin]      决定，来自创意文档「按心选文风设计视觉」
+   切文风只改第 3 层的变量，整页实时换皮，不重建任何 DOM。
+   ══════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── 1. 夜色基底 ───────────────────────────────────────── */
+  --night-900: #07061a;
+  --night-800: #0e0b2a;
+  --night-700: #17123d;
+  --dusk-600: #2a1f55;
+  --dusk-500: #3e2d76;
+  --dusk-400: #5b4498;
+  --moon-100: #fffbf0;
+  --moon-200: #f6efdc;
+  --moon-300: #e4d9be;
+  --peach-300: #f7c3d2;
+  --peach-400: #ef9cb4;
+  --gold-300: #f5dfa8;
+  --gold-400: #e9c46a;
+  --seal-500: #c0392b;
+
+  /* ── 语义色 ────────────────────────────────────────────── */
+  --ink-on-night: var(--moon-200);
+  --ink-dim: color-mix(in oklab, var(--moon-200) 55%, transparent);
+  --ink-faint: color-mix(in oklab, var(--moon-200) 30%, transparent);
+  --glow-warm: color-mix(in oklab, var(--gold-300) 70%, var(--peach-300));
+  --hairline: color-mix(in oklab, var(--moon-200) 22%, transparent);
+
+  /* ── 对象色系默认值（未选择时用恋人调，最接近七夕氛围）── */
+  --recipient-a: var(--peach-300);
+  --recipient-b: var(--dusk-400);
+  --recipient-c: var(--moon-100);
+
+  /* ── 文风皮肤默认值（未选择时用夜色，非任何具体文风）── */
+  --skin-paper: var(--night-800);
+  --skin-ink: var(--moon-200);
+  --skin-accent: var(--gold-300);
+  --skin-seal: var(--seal-500);
+  --font-display: var(--font-kai);
+  --font-poem: var(--font-serif);
+
+  /* ── 字体栈 ────────────────────────────────────────────
+     阶段 1 全部走系统自带字体：iOS 有宋体/楷体，Android 有思源，
+     首屏零字体下载。阶段 2 再按文风裁 3500 常用字的 woff2 懒加载。 */
+  --font-ui: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'HarmonyOS Sans SC',
+    'Noto Sans CJK SC', 'Source Han Sans SC', 'Microsoft YaHei', system-ui, sans-serif;
+  --font-serif: 'Songti SC', 'STSong', 'Source Han Serif SC', 'Noto Serif CJK SC',
+    'SimSun', serif;
+  --font-kai: 'Kaiti SC', 'STKaiti', 'KaiTi', 'Songti SC', serif;
+  --font-hand: 'Xingkai SC', 'STXingkai', 'Kaiti SC', cursive;
+  --font-round: 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans CJK SC', sans-serif;
+  --font-mono: 'SF Mono', ui-monospace, 'Menlo', monospace;
+
+  /* ── 尺度单位 ──────────────────────────────────────────
+     以 375×812 为设计画布，--su 是等比缩放系数。
+     写尺寸统一用 calc(N * var(--su))，N 直接取设计稿 px 值。
+     用 cq 单位而非 vw/vh：桌面端会把整个 H5 套进手机边框，
+     那时缩放必须跟边框走，不能跟浏览器窗口走。 */
+  --su: min(calc(100cqw / 375), calc(100cqh / 812));
+
+  /* ── 安全区 ────────────────────────────────────────────── */
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+
+  /* ── 层级 ────────────────────────────────────────────────
+     GL 画布和各幕 DOM 是 .frame 下的兄弟节点，两边都显式给 z-index，
+     不依赖「定位元素 vs 普通流」的绘制顺序（那条规则踩过一次坑）。
+     --z-scrim 是负值：它作用在幕自己的层叠上下文内部，
+     所以仍然压在 GL 画布之上、文字之下。 */
+  --z-gl: 0; /* WebGL 舞台（星河/粒子/shader） */
+  --z-scrim: -1; /* 文字下的柔和压暗，保证压在银河上也读得清 */
+  --z-stage: 10; /* DOM 舞台层（商品、卡牌、诗行） */
+  --z-ui: 20; /* 交互 UI（按钮、提示） */
+  --z-overlay: 30; /* 过场遮罩、白闪 */
+  --z-gate: 40; /* 桌面扫码引导 */
+
+  /* ── 动效节奏 ──────────────────────────────────────────── */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out-soft: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ══ 2. 对象色系 ══ 来自创意文档 §4.3「按送给谁定色系」 ══ */
+
+[data-recipient='lover'] {
+  --recipient-a: #f2a5bc; /* 桃粉 */
+  --recipient-b: #6b4e9e; /* 暮紫 */
+  --recipient-c: #f6f1e8; /* 月白 */
+}
+[data-recipient='bestie'] {
+  --recipient-a: #f9c3d2; /* 樱花粉 */
+  --recipient-b: #a8dcc8; /* 薄荷绿 */
+  --recipient-c: #f7e3a1; /* 奶油黄 */
+}
+[data-recipient='family'] {
+  --recipient-a: #efc77a; /* 暖黄 */
+  --recipient-b: #b98a5e; /* 原木 */
+  --recipient-c: #f3ead8; /* 米白 */
+}
+[data-recipient='pet'] {
+  --recipient-a: #d9b48f; /* 奶茶 */
+  --recipient-b: #e7dcc4; /* 燕麦 */
+  --recipient-c: #f7f0e4; /* 奶油白 */
+}
+
+/* ══ 3. 文风皮肤 ══ 来自创意文档 §4.3「按心选文风设计视觉」══
+   P0 三风深做；其余五风阶段 4 补静帧。 */
+
+[data-skin='guofeng'] {
+  /* 古风七言 · 月下诗笺：宣纸纹理、月亮、树影 */
+  --skin-paper: #efe7d5;
+  --skin-ink: #241f33;
+  --skin-accent: #b9975b;
+  --skin-seal: #b3342a;
+  --font-display: var(--font-kai);
+  --font-poem: var(--font-serif);
+}
+
+[data-skin='fafeng'] {
+  /* 发疯文学 · 大字报：贴纸、表情包、手写体 */
+  --skin-paper: #ffe24b;
+  --skin-ink: #111111;
+  --skin-accent: #ff3e7f;
+  --skin-seal: #e3170a;
+  --font-display: var(--font-ui);
+  --font-poem: var(--font-ui);
+}
+
+[data-skin='galgame'] {
+  /* 恋爱 Galgame · 游戏界面：UI 框、好感度条、选项按钮 */
+  --skin-paper: #1b1c3f;
+  --skin-ink: #f2f4ff;
+  --skin-accent: #6c7bff;
+  --skin-seal: #ff9ec4;
+  --font-display: var(--font-round);
+  --font-poem: var(--font-round);
+}

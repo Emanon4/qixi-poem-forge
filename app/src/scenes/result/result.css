@@ -1,0 +1,149 @@
+.result {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-ui);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(18 * var(--su));
+  padding: calc(var(--safe-t) + 40 * var(--su)) calc(22 * var(--su))
+    calc(var(--safe-b) + 26 * var(--su));
+  text-align: center;
+}
+
+/* ── 诗笺 ───────────────────────────────────────────────── */
+
+.result__sheet {
+  position: relative;
+  width: 100%;
+  padding: calc(30 * var(--su)) calc(24 * var(--su)) calc(26 * var(--su));
+  border-radius: calc(18 * var(--su));
+  background: color-mix(in oklab, var(--skin-paper) 95%, transparent);
+  border: 1px solid color-mix(in oklab, var(--skin-accent) 45%, transparent);
+  box-shadow:
+    0 calc(20 * var(--su)) calc(50 * var(--su)) rgb(0 0 0 / 45%),
+    inset 0 0 calc(60 * var(--su)) color-mix(in oklab, var(--skin-accent) 10%, transparent);
+}
+
+.result__meta {
+  font-size: calc(10.5 * var(--su));
+  letter-spacing: calc(1.2 * var(--su));
+  color: color-mix(in oklab, var(--skin-ink) 52%, transparent);
+}
+
+.result__title {
+  margin-top: calc(10 * var(--su));
+  font-family: var(--font-display);
+  font-size: calc(26 * var(--su));
+  font-weight: 600;
+  letter-spacing: calc(2 * var(--su));
+  color: var(--skin-ink);
+}
+
+.result__poem {
+  margin-top: calc(18 * var(--su));
+}
+
+.result__poem p {
+  font-family: var(--font-poem);
+  font-size: calc(15 * var(--su));
+  line-height: 2;
+  letter-spacing: calc(1.4 * var(--su));
+  color: var(--skin-ink);
+}
+
+/* 古风走竖排：列从右往左，和参考海报一致 */
+.result__poem.is-vertical {
+  display: flex;
+  flex-direction: row-reverse;
+  justify-content: center;
+  gap: calc(10 * var(--su));
+}
+
+.result__poem.is-vertical p {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  line-height: 1.5;
+  letter-spacing: calc(3 * var(--su));
+}
+
+.result__seal {
+  display: inline-grid;
+  place-items: center;
+  width: calc(32 * var(--su));
+  height: calc(32 * var(--su));
+  margin-top: calc(16 * var(--su));
+  border-radius: calc(5 * var(--su));
+  font-family: var(--font-serif);
+  font-size: calc(10.5 * var(--su));
+  line-height: 1.1;
+  color: #fff;
+  background: var(--skin-seal);
+}
+
+.result__tag {
+  margin-top: calc(14 * var(--su));
+  font-size: calc(11.5 * var(--su));
+  letter-spacing: calc(1 * var(--su));
+  color: color-mix(in oklab, var(--skin-ink) 62%, transparent);
+}
+
+/* ── 海报预览 ───────────────────────────────────────────── */
+
+.result__preview {
+  width: calc(150 * var(--su));
+}
+
+.result__preview img {
+  width: 100%;
+  border-radius: calc(10 * var(--su));
+  box-shadow: 0 calc(10 * var(--su)) calc(30 * var(--su)) rgb(0 0 0 / 50%);
+}
+
+.result__preview p {
+  margin-top: calc(8 * var(--su));
+  font-size: calc(10.5 * var(--su));
+  color: var(--ink-faint);
+}
+
+/* ── 操作 ───────────────────────────────────────────────── */
+
+.result__actions {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: calc(10 * var(--su));
+}
+
+.result__cta {
+  width: 100%;
+  padding: calc(15 * var(--su)) 0;
+  border-radius: calc(999 * var(--su));
+  font-size: calc(15.5 * var(--su));
+  letter-spacing: calc(2.5 * var(--su));
+  text-indent: calc(2.5 * var(--su));
+  color: #241a10;
+  background: linear-gradient(135deg, var(--gold-300), var(--peach-300));
+  box-shadow: 0 calc(6 * var(--su)) calc(24 * var(--su)) rgb(0 0 0 / 35%);
+}
+
+.result__row {
+  display: flex;
+  gap: calc(10 * var(--su));
+}
+
+.result__ghost {
+  flex: 1;
+  padding: calc(12 * var(--su)) 0;
+  border-radius: calc(999 * var(--su));
+  font-size: calc(12.5 * var(--su));
+  color: var(--moon-200);
+  border: 1px solid var(--hairline);
+  background: rgb(14 10 34 / 46%);
+}
+
+.result__cta:active,
+.result__ghost:active {
+  transform: scale(0.98);
+}

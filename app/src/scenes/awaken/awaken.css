@@ -1,0 +1,156 @@
+.awaken {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-ui);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: calc(var(--safe-t) + 58 * var(--su)) calc(24 * var(--su))
+    calc(var(--safe-b) + 40 * var(--su));
+  text-align: center;
+  pointer-events: none;
+}
+
+/* ── 顶部状态 ───────────────────────────────────────────── */
+
+.awaken__head {
+  position: relative;
+}
+
+.awaken__phase {
+  font-size: calc(14 * var(--su));
+  font-weight: 300;
+  letter-spacing: calc(2.4 * var(--su));
+  text-indent: calc(2.4 * var(--su));
+  color: var(--moon-200);
+  text-shadow: 0 calc(1 * var(--su)) calc(10 * var(--su)) rgb(10 6 26 / 80%);
+}
+
+/* 扫描期的三点脉冲。用 CSS 而非 GSAP：无限循环没必要占时间轴。 */
+.awaken__pulse {
+  display: flex;
+  gap: calc(6 * var(--su));
+  justify-content: center;
+  margin-top: calc(14 * var(--su));
+}
+
+.awaken__pulse i {
+  width: calc(4 * var(--su));
+  height: calc(4 * var(--su));
+  border-radius: 50%;
+  background: var(--gold-300);
+  animation: awaken-pulse 1.2s var(--ease-in-out-soft) infinite;
+}
+
+.awaken__pulse i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.awaken__pulse i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes awaken-pulse {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.25);
+  }
+}
+
+/* ── 识别结果卡 ─────────────────────────────────────────── */
+
+.awaken__card {
+  position: relative;
+  width: 100%;
+  padding: calc(24 * var(--su)) calc(22 * var(--su)) calc(20 * var(--su));
+  border-radius: calc(22 * var(--su));
+  background: rgb(16 11 38 / 62%);
+  border: 1px solid var(--hairline);
+  backdrop-filter: blur(calc(14 * var(--su)));
+  -webkit-backdrop-filter: blur(calc(14 * var(--su)));
+  pointer-events: auto;
+}
+
+.awaken__card-title {
+  font-family: var(--font-serif);
+  font-size: calc(20 * var(--su));
+  letter-spacing: calc(2 * var(--su));
+  color: var(--moon-100);
+}
+
+.awaken__card-title strong {
+  font-weight: 600;
+  color: var(--gold-300);
+  margin-left: calc(2 * var(--su));
+}
+
+.awaken__card-line {
+  margin-top: calc(12 * var(--su));
+  font-size: calc(13 * var(--su));
+  font-weight: 300;
+  line-height: 1.85;
+  letter-spacing: calc(1 * var(--su));
+  color: var(--ink-dim);
+}
+
+.awaken__actions {
+  display: flex;
+  gap: calc(12 * var(--su));
+  margin-top: calc(22 * var(--su));
+}
+
+.awaken__cta {
+  flex: 1;
+  padding: calc(14 * var(--su)) 0;
+  border-radius: calc(999 * var(--su));
+  font-size: calc(15 * var(--su));
+  letter-spacing: calc(2 * var(--su));
+  text-indent: calc(2 * var(--su));
+  color: #241a10;
+  background: linear-gradient(135deg, var(--gold-300), var(--peach-300));
+  box-shadow: 0 calc(6 * var(--su)) calc(24 * var(--su)) rgb(233 196 106 / 28%);
+}
+
+.awaken__ghost {
+  padding: calc(14 * var(--su)) calc(18 * var(--su));
+  border-radius: calc(999 * var(--su));
+  font-size: calc(13 * var(--su));
+  color: var(--ink-dim);
+  border: 1px solid var(--hairline);
+}
+
+.awaken__cta:active,
+.awaken__ghost:active {
+  transform: scale(0.97);
+  transition: transform 0.12s var(--ease-out-soft);
+}
+
+/* ── 品类改选 ───────────────────────────────────────────── */
+
+.awaken__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(9 * var(--su));
+  justify-content: center;
+  margin-top: calc(16 * var(--su));
+}
+
+.awaken__chip {
+  padding: calc(9 * var(--su)) calc(15 * var(--su));
+  border-radius: calc(999 * var(--su));
+  font-size: calc(13 * var(--su));
+  color: var(--moon-200);
+  border: 1px solid var(--hairline);
+  background: rgb(255 255 255 / 5%);
+}
+
+.awaken__chip.is-on {
+  color: #241a10;
+  background: var(--gold-300);
+  border-color: transparent;
+}
