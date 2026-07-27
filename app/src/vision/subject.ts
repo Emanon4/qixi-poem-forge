@@ -1,13 +1,19 @@
 /**
  * 「半真识别」—— 纯 CPU、零依赖、零网络的商品主体定位。
  *
- * 购物截图有个很稳的共性：背景是大片白/浅灰，商品图是画面里唯一
- * 又饱和又有对比的区域。所以把图缩到 48×48，量出每个格子相对
- * 「边框基准色」的偏离度，再取偏离度高的格子的包围盒，就能把商品
- * 框出来。这不是分割模型，但对真实截图命中率足够撑起 demo，
- * 而且比「假识别 + 让用户手选品类」有说服力得多。
+ * 两阶段，因为单看像素永远分不清「商品」和「文字」：
  *
- * 顺带返回主色，用来给第1幕的描金边和识别反馈文案定调。
+ *   一、找商品图所在的**行带**。判别特征是稠密度 ——
+ *       商品照片会把整行填满，而标题/价格/规格这些文字行是稀疏的
+ *       （大片白底 + 少量笔画）。取最长的稠密行带。
+ *   二、只在这条带**之内**做区域生长找主体，永远不会跑到价格区去。
+ *
+ * 第一版只算「离背景色的距离 + 饱和度」，被商品图自带的浅色底整块骗过；
+ * 加了局部梯度之后，又被红色价格文字骗过 —— 文字的梯度和饱和度
+ * 恰恰是全图最高的。所以判别必须落在「稠密 vs 稀疏」这个维度上。
+ *
+ * 这不是分割模型，但对真实购物截图的版式命中率足够撑起 demo。
+ * 顺带返回主色，给第1幕的描金边和识别反馈文案定调。
  */
 
 export interface SubjectBox {
@@ -47,7 +53,7 @@ export function guessCategory(color: [number, number, number], box: SubjectBox):
   return tall ? '香水' : '项链'
 }
 
-const GRID = 48
+const GRID = 56
 
 /** 居中兜底框：识别不出来时用它，流程绝不卡死。 */
 const FALLBACK: SubjectBox = {
@@ -74,7 +80,7 @@ export function findSubject(source: TexImageSource): SubjectBox {
     return [data[i], data[i + 1], data[i + 2]]
   }
 
-  // 边框一圈的平均色作为「背景基准」。购物截图的四周基本都是页面底色。
+  // ── 页面底色：取四条边的平均。购物截图四周基本都是页面白 ──
   let br = 0
   let bg = 0
   let bb = 0
@@ -97,91 +103,176 @@ export function findSubject(source: TexImageSource): SubjectBox {
   bg /= n
   bb /= n
 
-  // 每格的「显著度」= 离背景色的距离 + 自身饱和度
-  const salience = new Float32Array(GRID * GRID)
-  let maxSalience = 0
+  const distAt = (x: number, y: number): number => {
+    const [r, g, b] = at(x, y)
+    return Math.hypot(r - br, g - bg, b - bb) / 441 // 441 = sqrt(3)*255
+  }
+
+  /* ── 一、找商品图的行带 ──
+     判据用**行内中位数**，不是「偏离底色的格子占比」。
+     占比会被中文标题骗过去：一行汉字的笔画能让大半格子都偏离底色。
+     中位数则很干脆 —— 文字行大部分格子仍是白底，中位数≈0；
+     照片行整行都偏离底色，中位数显著为正。 */
+  const density = new Float32Array(GRID)
+  const row = new Float32Array(GRID)
   for (let y = 0; y < GRID; y++) {
-    for (let x = 0; x < GRID; x++) {
-      const [r, g, b] = at(x, y)
-      const dist = Math.hypot(r - br, g - bg, b - bb) / 441 // 441 = sqrt(3)*255
-      const sat = (Math.max(r, g, b) - Math.min(r, g, b)) / 255
-      const s = dist * 0.75 + sat * 0.25
-      salience[y * GRID + x] = s
-      if (s > maxSalience) maxSalience = s
+    for (let x = 0; x < GRID; x++) row[x] = distAt(x, y)
+    const sorted = Array.from(row).sort((p, q) => p - q)
+    density[y] = sorted[GRID >> 1]
+  }
+
+  const DENSE = 0.03
+  const searchTo = Math.floor(GRID * 0.8) // 大图基本不会出现在页面最底部
+  let bandTop = -1
+  let bandBottom = -1
+  let runStart = -1
+  for (let y = 0; y <= searchTo; y++) {
+    if (density[y] >= DENSE) {
+      if (runStart < 0) runStart = y
+      if (y - runStart > bandBottom - bandTop) {
+        bandTop = runStart
+        bandBottom = y
+      }
+    } else {
+      runStart = -1
     }
   }
-  if (maxSalience < 0.06) return FALLBACK // 几乎纯色图，放弃
 
-  /* 从最显著的那一格做区域生长，而不是取所有显著格子的总包围盒。
-     两种错误取包围盒都会犯：
-       · 阈值低 → 商品标题和红色价格一起被圈进来，框住半张页面；
-       · 阈值高 → 只剩商品上最扎眼的一小块（实测会只框住罐子上的标签）。
-     连通生长能顺着商品本体铺开，又跨不过商品图和文字区之间那片白底。 */
-  let seed = 0
-  for (let i = 1; i < salience.length; i++) {
-    if (salience[i] > salience[seed]) seed = i
+  // 没找到稠密带（比如商品图也是纯白底）→ 退回电商详情页大图的常见位置
+  if (bandTop < 0 || bandBottom - bandTop < 6) {
+    bandTop = Math.floor(GRID * 0.08)
+    bandBottom = Math.floor(GRID * 0.62)
   }
 
-  const grow = maxSalience * 0.28
-  const visited = new Uint8Array(GRID * GRID)
-  const queue = [seed]
-  visited[seed] = 1
-  let minX = GRID
-  let minY = GRID
-  let maxX = -1
-  let maxY = -1
-  let hits = 0
+  /* ── 二、只在带内找主体 ──
+     上下各裁掉两行：商品图区域和页面白底的交界本身是一条**全宽的高梯度线**，
+     不裁的话它会被当成最显著的东西，包围盒直接撑满整幅宽度。
+     那是容器的边，不是商品。 */
+  const innerTop = Math.min(bandTop + 2, bandBottom)
+  const innerBottom = Math.max(bandBottom - 2, bandTop)
+
+  const salience = new Float32Array(GRID * GRID)
+  let maxSalience = 0
+  for (let y = innerTop; y <= innerBottom; y++) {
+    for (let x = 0; x < GRID; x++) {
+      const [r, g, b] = at(x, y)
+      const dist = distAt(x, y)
+      const sat = (Math.max(r, g, b) - Math.min(r, g, b)) / 255
+
+      // 与四邻的色差 —— 平坦区域为 0，商品的轮廓与细节处高
+      let grad = 0
+      for (const [dx, dy] of [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ] as const) {
+        const nx = Math.min(GRID - 1, Math.max(0, x + dx))
+        const ny = Math.min(innerBottom, Math.max(innerTop, y + dy))
+        const [nr, ng, nb] = at(nx, ny)
+        grad += Math.hypot(r - nr, g - ng, b - nb)
+      }
+      grad = Math.min(1, grad / (441 * 1.4))
+
+      const v = dist * 0.30 + sat * 0.20 + grad * 0.50
+      salience[y * GRID + x] = v
+      if (v > maxSalience) maxSalience = v
+    }
+  }
+  if (maxSalience < 0.05) {
+    console.info('[subject] 放弃：全图显著度过低 ' + JSON.stringify({ maxSalience: +maxSalience.toFixed(3), bandTop, bandBottom }))
+    return FALLBACK
+  }
+
+  /* 不做连通生长，改用**坐标分位数包围盒**。
+     连通性在这里是错的假设：项链这种细环细链，环的内部就是背景色，
+     显著度分布是双峰的（边缘极高、大片背景极低），中间没有过渡 ——
+     于是任何阈值要么只圈住种子周围几格，要么一路淹掉整条带。
+     取「显著度前若干的格子」再对它们的坐标取分位数，
+     细轮廓和实心块都成立，也天然抗离群点。 */
+  const values: number[] = []
+  for (let y = innerTop; y <= innerBottom; y++) {
+    for (let x = 0; x < GRID; x++) values.push(salience[y * GRID + x])
+  }
+  values.sort((a2, b2) => a2 - b2)
+  const quantile = (q: number): number => values[Math.floor(q * (values.length - 1))]
+
+  let picked: { x: number; y: number }[] = []
   let sr = 0
   let sg = 0
   let sb = 0
-
-  while (queue.length > 0) {
-    const idx = queue.pop()!
-    const x = idx % GRID
-    const y = (idx - x) / GRID
-
-    hits++
-    if (x < minX) minX = x
-    if (y < minY) minY = y
-    if (x > maxX) maxX = x
-    if (y > maxY) maxY = y
-    const [r, g, b] = at(x, y)
-    sr += r
-    sg += g
-    sb += b
-
-    for (const [dx, dy] of [
-      [1, 0],
-      [-1, 0],
-      [0, 1],
-      [0, -1],
-    ] as const) {
-      const nx = x + dx
-      const ny = y + dy
-      if (nx < 0 || ny < 0 || nx >= GRID || ny >= GRID) continue
-      const n = ny * GRID + nx
-      if (visited[n] || salience[n] < grow) continue
-      visited[n] = 1
-      queue.push(n)
+  for (const q of [0.88, 0.8, 0.7, 0.55]) {
+    const threshold = quantile(q)
+    picked = []
+    sr = 0
+    sg = 0
+    sb = 0
+    for (let y = innerTop; y <= innerBottom; y++) {
+      for (let x = 0; x < GRID; x++) {
+        if (salience[y * GRID + x] < threshold) continue
+        picked.push({ x, y })
+        const [r, g, b] = at(x, y)
+        sr += r
+        sg += g
+        sb += b
+      }
     }
+    if (picked.length >= 10) break
   }
-  if (hits < 6 || maxX < 0) return FALLBACK
+  const hits = picked.length
+  if (hits < 6) {
+    console.info('[subject] 放弃：显著格子太少 ' + JSON.stringify({ hits, bandTop, bandBottom }))
+    return FALLBACK
+  }
 
-  // 生长区域铺满整图说明没有明显主体，判为低置信
-  const coverage = hits / (GRID * GRID)
+  // 坐标分位数：掐掉两头各 6% 的离群格，剩下的就是主体的实际范围
+  const xs = picked.map((c) => c.x).sort((a2, b2) => a2 - b2)
+  const ys = picked.map((c) => c.y).sort((a2, b2) => a2 - b2)
+  const pick = (arr: number[], q: number): number => arr[Math.floor(q * (arr.length - 1))]
+  const minX = pick(xs, 0.06)
+  const maxX = pick(xs, 0.94)
+  const minY = pick(ys, 0.06)
+  const maxY = pick(ys, 0.94)
+
   const spanW = (maxX - minX + 1) / GRID
   const spanH = (maxY - minY + 1) / GRID
-  const confidence = coverage > 0.72 || spanW > 0.95 ? 0.2 : Math.min(1, maxSalience * 2.4)
-  if (confidence < 0.35) return { ...FALLBACK, color: [sr / hits, sg / hits, sb / hits] }
+
+  /* 主色取**包围盒内部**的均值，而不是显著格子的均值。
+     显著格子基本都落在轮廓上，取它们的均值会偏向边缘的过渡色，
+     猜品类时三张样图会一律猜成同一个东西。 */
+  let cr = 0
+  let cg = 0
+  let cb = 0
+  let cn = 0
+  for (let y = minY; y <= maxY; y++) {
+    for (let x = minX; x <= maxX; x++) {
+      const [r, g, b] = at(x, y)
+      cr += r
+      cg += g
+      cb += b
+      cn++
+    }
+  }
+  const color: [number, number, number] =
+    cn > 0 ? [cr / cn, cg / cn, cb / cn] : [sr / hits, sg / hits, sb / hits]
+
+  // 细长如一条线（多半抓到了文字行或边框），或者铺满整条带，都判低置信
+  const thin = spanW < 0.05 || spanH < 0.05
+  const sprawl = spanW > 0.92 && spanH > 0.85
+  const confidence = thin || sprawl ? 0.25 : Math.min(1, maxSalience * 2.6)
+  if (confidence < 0.35) {
+    console.info('[subject] 放弃：置信度不足 ' + JSON.stringify({ confidence: +confidence.toFixed(3), thin, spanW: +spanW.toFixed(3), spanH: +spanH.toFixed(3), maxSalience: +maxSalience.toFixed(3), bandTop, bandBottom, hits }))
+    return { ...FALLBACK, color }
+  }
 
   // 稍微外扩，别把商品边缘切掉
-  const pad = 0.03
+  const pad = 0.035
   return {
     x: Math.max(0, minX / GRID - pad),
     y: Math.max(0, minY / GRID - pad),
     w: Math.min(1, spanW + pad * 2),
     h: Math.min(1, spanH + pad * 2),
-    color: [sr / hits, sg / hits, sb / hits],
+    color,
     confidence,
   }
 }

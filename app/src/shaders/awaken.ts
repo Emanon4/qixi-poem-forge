@@ -21,6 +21,12 @@ uniform float uDissolve;
 uniform float uLift;
 uniform float uFade;      // 整幕淡出，交给下一幕时用
 
+/* 截图整体的曝光系数。
+   购物截图大面积是纯白 #ffffff，线性空间就是 1.0，远高于辉光阈值 ——
+   原样进场景会被当成光源，整张糊成一团白饼（真机上就是这么翻的车）。
+   它应该读作「夜色里被照亮的一张纸」，不是灯。 */
+const float SHEET_GAIN = 0.40;
+
 /** 主体遮罩：圆角方 SDF，柔边。inset 往内收，用来取描边环。 */
 float subjectMask(vec2 q, vec4 box, float inset) {
   vec2 c = box.xy + box.zw * 0.5;
@@ -51,7 +57,7 @@ void main() {
   // ── 背景层：截图的非主体部分，会被扫描、然后被溶解掉 ──
   if (img.x > 0.0 && img.x < 1.0 && img.y > 0.0 && img.y < 1.0) {
     // 贴图采样出来是 sRGB，必须转线性才能和后面的加光、ACES 对齐
-    vec3 shot = srgb2lin(texture(uShot, img).rgb);
+    vec3 shot = srgb2lin(texture(uShot, img).rgb) * SHEET_GAIN;
 
     // 扫描线自上而下：img.y 从 0(顶) 到 1(底)，扫过的区域在线之上
     float scanned = smoothstep(uScan + 0.03, uScan - 0.03, img.y);
@@ -68,7 +74,13 @@ void main() {
     float burn = smoothstep(n - 0.16, n + 0.03, uDissolve) * outside;
     // 消失前先烧成一道金边，才有「余烬」而不是「橡皮擦」
     float ember = smoothstep(n - 0.07, n, uDissolve) * (1.0 - smoothstep(n, n + 0.12, uDissolve));
-    analyzed += srgb2lin(vec3(1.0, 0.70, 0.28)) * ember * 2.2 * outside;
+    analyzed += srgb2lin(vec3(1.0, 0.70, 0.28)) * ember * 0.85 * outside;
+
+    /* 主体之外随着提取推进而去饱和 + 压暗。
+       这样即使主体框判偏了，读起来也只是「聚焦到了别处」，
+       而不是「一大块高亮 = 坏了」。失败姿态要体面。 */
+    float defocus = max(uDissolve, lift) * outside;
+    analyzed = mix(analyzed, vec3(lum * SHEET_GAIN) * 0.55, defocus * 0.75);
 
     col = analyzed;
     alpha = (1.0 - burn) * (1.0 - lift * 0.85); // 背景整体也随上浮淡出
@@ -76,12 +88,12 @@ void main() {
 
   // ── 主体层：叠在背景之上，带金色描边 ──
   if (imgSub.x > 0.0 && imgSub.x < 1.0 && imgSub.y > 0.0 && imgSub.y < 1.0 && mask > 0.001) {
-    vec3 subject = srgb2lin(texture(uShot, imgSub).rgb);
+    vec3 subject = srgb2lin(texture(uShot, imgSub).rgb) * SHEET_GAIN;
     // 描边：内外两条遮罩取差，得到一圈沿主体轮廓的环
     float rim = mask - subjectMask(imgSub, uSubject, 0.09);
-    subject += srgb2lin(vec3(1.0, 0.84, 0.52)) * clamp(rim, 0.0, 1.0) * 1.6 * lift;
-    // 主体略微提亮，从截图里「被点亮」
-    subject *= 1.0 + 0.22 * lift;
+    subject += srgb2lin(vec3(1.0, 0.84, 0.52)) * clamp(rim, 0.0, 1.0) * 1.1 * lift;
+    // 主体略微提亮，从截图里「被点亮」。系数不能大 —— 白底商品图一提就过曝。
+    subject *= 1.0 + 0.28 * lift;
 
     col = mix(col, subject, mask);
     alpha = max(alpha, mask);
@@ -93,7 +105,7 @@ void main() {
   // 注意：active 是 GLSL ES 保留字，不能用作变量名
   float sweeping = smoothstep(0.0, 0.02, uScan) * smoothstep(1.0, 0.96, uScan);
   float line = (exp(-lineD * 320.0) * 1.0 + exp(-lineD * 42.0) * 0.28) * onSheet * sweeping;
-  col += srgb2lin(vec3(0.72, 0.95, 1.0)) * line * 1.6;
+  col += srgb2lin(vec3(0.72, 0.95, 1.0)) * line * 1.0;
   alpha = max(alpha, line * 0.9);
 
   if (alpha < 0.004) discard;
